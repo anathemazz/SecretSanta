@@ -20,6 +20,24 @@ const Hobby = sequelize.define('hobby', {
 
 const User_hob = sequelize.define('user_hob', {
     id: {type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true},
+    userId: {
+        type: DataTypes.INTEGER,
+        unique: true,
+        allowNull: false,
+        references: {
+            model: User,
+            key: 'id'
+        }
+    },
+    hobbyId: {
+        type: DataTypes.INTEGER,
+        unique: true,
+        allowNull: false,
+        references: {
+            model: Hobby,
+            key: 'id'
+        }
+    }
 })
 
 const User_pair = sequelize.define('user_pair', {
@@ -66,6 +84,27 @@ User_pair.belongsTo(User,{
     as: 'rec_user',
     foreignKey: 'rec_id'
 })
+
+User.hasMany(User_hob, {
+    as: 'userHobby',
+    foreignKey: 'userId',
+})
+
+User_hob.belongsTo(User, {
+    as: 'user',
+    foreignKey: 'userId',
+})
+
+Hobby.hasMany(User_hob, {
+    as: 'HobbyUser',
+    foreignKey: 'hobbyId',
+})
+
+User_hob.belongsTo(Hobby, {
+    as: 'hobby',
+    foreignKey: 'hobbyId',
+})
+
 module.exports = {
     User,
     User_pair,

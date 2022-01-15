@@ -102,11 +102,20 @@ class UserController {
     async getOne(req, res, next) {
         try {
             const id = req.params.id
-            const user = await User.findByPk(id)
+            const user = await User.findByPk(id, {
+                include: [{
+                    model: User_hob,
+                    as: 'userHobby',
+                    required: false,
+                    include: [{
+                        model: Hobby,
+                        as: 'hobby',
+                        required: false
+                    }]
+                }]
+            })
 
             if (user) {
-                /*let hobby = await UserHobby.findAll({where: {userId: id}})
-                user.hobby = hobby*/
                 return res.json(user)
             } else {
                 next(ApiError.badRequest(`Пользователь с id = ${id} не найден`))

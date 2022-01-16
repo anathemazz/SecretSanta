@@ -6,11 +6,11 @@ const User = sequelize.define('user', {
     email: {type: DataTypes.STRING, unique: true},
     password: {type: DataTypes.STRING},
     role: {type: DataTypes.STRING, defaultValue: "USER"},
-    name: {type: DataTypes.STRING, allowNull: false},
-    sex: {type: DataTypes.STRING},
-    age: {type: DataTypes.INTEGER},
-    post_adr: {type: DataTypes.STRING},
-    img: {type: DataTypes.STRING},
+    name: {type: DataTypes.STRING, defaultValue: ""},
+    sex: {type: DataTypes.STRING, defaultValue: ""},
+    age: {type: DataTypes.INTEGER, defaultValue: 0},
+    post_adr: {type: DataTypes.STRING, defaultValue: ""},
+    img: {type: DataTypes.STRING, defaultValue: ""},
 })
 
 const Hobby = sequelize.define('hobby', {

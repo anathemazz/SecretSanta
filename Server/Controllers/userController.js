@@ -2,38 +2,47 @@ const ApiError = require('../error/ApiError');
 const uuid = require('uuid')
 const path = require('path');
 const fileSys = require('fs');
+const bcrypt = require('bcrypt')
+const jwt = require('jsonwebtoken')
 const {User, Hobby, User_hob} = require('../models/models')
+
+const generateJwt = (id, email, role) => {
+    return jwt.sign({id, email, role}, process.env.SECRET_KEY, {expiresIn: '24h'})
+}
 
 class UserController {
     async registration(req, res, next) {
-        try {
-            let {email, password, name, sex, age, post_adr} = req.body
-            let fileName = ''
-            if (req.files) {
-                const {img} = req.files
-                let fileNAme = uuid.v4() + ".jpg"
-                await img.mv(path.resolve(__dirname, '..', 'static', fileNAme))
-            }
-
-            const user = await User.create({email, password, name, sex, age, post_adr, img: fileName})
-
-            return res.json(user)
-        } catch (e) {
-            next(ApiError.badRequest(e.message))
+        const {email, password, role} = req.body
+        if (!email || !password) {
+            return next(ApiError.badRequest('Некорректный email или password'))
         }
-
+        const candidate = await User.findOne({where: {email}})
+        if (candidate) {
+            return next(ApiError.badRequest('Пользователь с таким email уже существует'))
+        }
+        const hashPassword = await bcrypt.hash(password, 5)
+        const user = await User.create({email, role, password: hashPassword})
+        const token = generateJwt(user.id, user.email, user.role)
+        return res.json({token})
     }
 
-    async login(req, res) {
-
+    async login(req, res, next) {
+        const {email, password} = req.body
+        const user = await User.findOne({where: {email}})
+        if (!user) {
+            return next(ApiError.internal('Пользователь не найден'))
+        }
+        let comparePassword = bcrypt.compareSync(password, user.password)
+        if (!comparePassword) {
+            return next(ApiError.internal('Указан неверный пароль'))
+        }
+        const token = generateJwt(user.id, user.email, user.role)
+        return res.json({token})
     }
 
     async check(req, res, next) {
-        const {id} = req.query
-        if (!id) {
-            return next(ApiError.badRequest('Не задан ID'))
-        }
-        res.json(id)
+        const token = generateJwt(req.user.id, req.user.email, req.user.role)
+        return res.json({token})
     }
 
     async update(req, res, next) {
@@ -42,7 +51,7 @@ class UserController {
             let {name, sex, age, post_adr, fileName, hobby} = req.body
 
             const user = await User.findByPk(id)
-            if (user){
+            if (user) {
                 if (!fileName || fileName !== user.img) {
                     if (req.files) {
                         const {img} = req.files
@@ -56,7 +65,23 @@ class UserController {
                 await user.update({name, sex, age, post_adr, img: fileName})
 
                 if (hobby) {
-                    let hid = [];
+                    await User_hob.destroy({where: {userId: id}})
+
+                    for await (const i of hobby) {
+                        try {
+                            const hobbyOld = await Hobby.findOne({where: {name: i.name}})
+                            if (hobbyOld) {
+                                await User_hob.create({userId: id, hobbyId: hobbyOld.id})
+                            } else {
+                                const hobbyNew = await Hobby.create({name: i.name})
+                                await User_hob.create({UserId: id, hobbyId: hobbyNew.id})
+                            }
+                        } catch (e) {
+                            next(ApiError.badRequest(e.message))
+                        }
+                    }
+
+                    /*let hid = [];
                     hobby.forEach(i =>
                         Hobby.findOne({where: {name: i.name}}).then((ho) => {
                             if (ho) {
@@ -73,18 +98,21 @@ class UserController {
                         }).catch((e) => {
                             next(ApiError.badRequest(e.message))
                         })
-                    )
+                    )*/
+
+                    return await UserController.getUserDeep(id, res, next)
+                } else {
+                    return res.json(user)
                 }
             } else {
                 next(ApiError.badRequest(`Пользователь с id = ${id} не найден`))
             }
-            return res.json(user)
         } catch (e) {
             next(ApiError.badRequest(e.message))
         }
     }
 
-    static updateUserHobby(hid, len, user_id, next) {
+    /*static updateUserHobby(hid, len, user_id, next) {
         if (hid.length === len) {
             User_hob.destroy({where: {userId: user_id}}).then(() => {
                 hid.forEach(i => {
@@ -97,9 +125,38 @@ class UserController {
                 next(ApiError.badRequest((e.message)))
             })
         }
+    }*/
+
+    static async getUserDeep(id, res, next) {
+        try {
+            const user = await User.findByPk(id, {
+                include: [{
+                    model: User_hob,
+                    as: 'user_hob',
+                    required: false,
+                    include: [{
+                        model: Hobby,
+                        as: 'hobby',
+                        required: false
+                    }]
+                }]
+            })
+            if (user) {
+                return res.json(user)
+            } else {
+                next(ApiError.badRequest(`Пользователь с id = ${id} не найден`))
+            }
+        } catch (e) {
+            next(ApiError.badRequest(e.message))
+        }
     }
 
     async getOne(req, res, next) {
+        const id = req.params.id
+        return await UserController.getUserDeep(id, res, next)
+    }
+
+    /*async getOne(req, res, next) {
         try {
             const id = req.params.id
             const user = await User.findByPk(id, {
@@ -124,7 +181,7 @@ class UserController {
         catch (e) {
             next(ApiError.badRequest(e.message))
         }
-    }
+    }*/
 }
 
 module.exports = new UserController()

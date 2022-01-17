@@ -1,0 +1,6 @@
+export const Admin_Route = '/admin'
+export const Login_Route = '/login'
+export const Reg_Route = '/auth'
+export const Ff_Route = '/friend_form'
+export const Of_Route = '/own_form'
+export const Rules_Route = '/'
